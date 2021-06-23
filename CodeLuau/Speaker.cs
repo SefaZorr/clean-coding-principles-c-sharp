@@ -27,65 +27,26 @@ namespace CodeLuau
         /// <returns>speakerID</returns>
         public RegisterResponse Register(IRepository repository)
         {
-            int? speakerId = null;
-
-            var error = ValidateData();
+            var error = ValidateRegistration();
             if (error != null) return new RegisterResponse(error);
+            int? speakerId = repository.SaveSpeaker(this);
+            return new RegisterResponse((int)speakerId);
+        }
+        
+        private RegisterError? ValidateRegistration()
+        {
+            var error = ValidateData();
+            if (error != null) return error;
 
             bool speakerAppearsQualified = AppearsExceptional() || !HasObviousRedFlags();
 
             if (!speakerAppearsQualified)
             {
-                return new RegisterResponse(RegisterError.SpeakerDoesNotMeetStandards);
+                return RegisterError.SpeakerDoesNotMeetStandards;
             }
-
             bool atLeastOneSessionApproved = ApproveSessions();
-
-            if (atLeastOneSessionApproved)
-            {
-                //if we got this far, the speaker is approved
-                //let's go ahead and register him/her now.
-                //First, let's calculate the registration fee. 
-                //More experienced speakers pay a lower fee.
-                if (YearsExperience <= 1)
-                {
-                    RegistrationFee = 500;
-                }
-                else if (YearsExperience >= 2 && YearsExperience <= 3)
-                {
-                    RegistrationFee = 250;
-                }
-                else if (YearsExperience >= 4 && YearsExperience <= 5)
-                {
-                    RegistrationFee = 100;
-                }
-                else if (YearsExperience >= 6 && YearsExperience <= 9)
-                {
-                    RegistrationFee = 50;
-                }
-                else
-                {
-                    RegistrationFee = 0;
-                }
-
-
-                //Now, save the speaker and sessions to the db.
-                try
-                {
-                    speakerId = repository.SaveSpeaker(this);
-                }
-                catch (Exception e)
-                {
-                    //in case the db call fails 
-                }
-            }
-            else
-            {
-                return new RegisterResponse(RegisterError.NoSessionsApproved);
-            }
-
-            //if we got this far, the speaker is registered.
-            return new RegisterResponse((int)speakerId);
+            if (!atLeastOneSessionApproved) return RegisterError.NoSessionsApproved;
+            return null;
         }
 
         private bool ApproveSessions()
